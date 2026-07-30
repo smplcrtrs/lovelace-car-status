@@ -1,0 +1,6 @@
+{
+  "name": "Car Status Card",
+  "filename": "car-status.js",
+  "homeassistant": "2025.7.0",
+  "render_readme": true
+}

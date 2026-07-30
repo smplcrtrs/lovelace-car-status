@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Car Status Card — dev harness</title>
+    <style>
+      :root {
+        --primary-text-color: #e1e1e1;
+        --secondary-text-color: #9b9b9b;
+        --card-background-color: #1c1c1c;
+        --secondary-background-color: #282828;
+        --divider-color: rgba(255, 255, 255, 0.12);
+        --primary-color: #03a9f4;
+        --accent-color: #ff9800;
+        --disabled-color: #6f6f6f;
+        --red-color: #f44336;
+        --pink-color: #e91e63;
+        --purple-color: #926bc7;
+        --deep-purple-color: #6e41ab;
+        --indigo-color: #3f51b5;
+        --blue-color: #2196f3;
+        --light-blue-color: #03a9f4;
+        --cyan-color: #00bcd4;
+        --teal-color: #009688;
+        --green-color: #4caf50;
+        --light-green-color: #8bc34a;
+        --lime-color: #cddc39;
+        --yellow-color: #ffeb3b;
+        --amber-color: #ffc107;
+        --orange-color: #ff9800;
+        --deep-orange-color: #ff5722;
+        --brown-color: #795548;
+        --light-grey-color: #bdbdbd;
+        --grey-color: #9e9e9e;
+        --dark-grey-color: #606060;
+        --blue-grey-color: #607d8b;
+        --black-color: #000;
+        --white-color: #fff;
+        color-scheme: dark;
+      }
+      body.light {
+        --primary-text-color: #212121;
+        --secondary-text-color: #727272;
+        --card-background-color: #fff;
+        --secondary-background-color: #f5f5f5;
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        padding: 20px;
+        background: var(--secondary-background-color);
+        color: var(--primary-text-color);
+        font-family: system-ui, sans-serif;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+        align-items: start;
+      }
+      .case.wide {
+        grid-column: 1 / -1;
+      }
+      .case > h2 {
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--secondary-text-color);
+        margin: 0 0 6px;
+      }
+      #controls {
+        margin-bottom: 16px;
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--divider-color);
+        background: var(--card-background-color);
+        color: var(--primary-text-color);
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="controls">
+      <button id="theme">Toggle light/dark</button>
+      <button id="toggle">Toggle all panels</button>
+    </div>
+    <div class="grid" id="grid"></div>
+
+    <script type="module">
+      import "../dist/car-status.js";
+
+      // ---- Minimal stubs for the HA elements the card renders into ----
+      class HaCard extends HTMLElement {
+        set header(v) {
+          this._header = v;
+          this.render();
+        }
+        connectedCallback() {
+          this.render();
+        }
+        render() {
+          if (this._done) return;
+          this._done = true;
+          const shadow = this.attachShadow({ mode: "open" });
+          shadow.innerHTML = `
+            <style>
+              :host { display:block; background:var(--card-background-color);
+                      border-radius:12px; border:1px solid var(--divider-color); }
+              h1 { font-size:20px; font-weight:400; padding:12px 16px 0; margin:0; }
+            </style>
+            ${this._header ? `<h1>${this._header}</h1>` : ""}
+            <slot></slot>`;
+        }
+      }
+      customElements.define("ha-card", HaCard);
+
+      class HaIcon extends HTMLElement {
+        set icon(v) {
+          this.textContent = "●";
+          this.title = v;
+        }
+      }
+      customElements.define("ha-icon", HaIcon);
+
+      // ---- Stub hass ----
+      const OPENINGS = [
+        "front_left_door",
+        "front_right_door",
+        "back_left_door",
+        "back_right_door",
+        "front_left_window",
+        "front_right_window",
+        "back_left_window",
+        "back_right_window",
+        "hood",
+        "trunk",
+      ];
+
+      function makeHass(openState) {
+        const states = {};
+        for (const o of OPENINGS) {
+          states[`binary_sensor.santa_fe_${o}_is_open`] = {
+            entity_id: `binary_sensor.santa_fe_${o}_is_open`,
+            state: openState,
+            attributes: { friendly_name: o },
+          };
+        }
+        states["sensor.santa_fe_fuel_level"] = {
+          entity_id: "sensor.santa_fe_fuel_level",
+          state: "62",
+          attributes: { friendly_name: "Fuel level", unit_of_measurement: "%" },
+        };
+        states["sensor.santa_fe_odometer"] = {
+          entity_id: "sensor.santa_fe_odometer",
+          state: "24518",
+          attributes: { friendly_name: "Odometer", unit_of_measurement: "mi" },
+        };
+        states["sensor.santa_fe_next_service_distance"] = {
+          entity_id: "sensor.santa_fe_next_service_distance",
+          state: "4820",
+          attributes: { friendly_name: "Next service", unit_of_measurement: "mi" },
+        };
+        states["binary_sensor.santa_fe_is_locked"] = {
+          entity_id: "binary_sensor.santa_fe_is_locked",
+          state: "off",
+          attributes: { friendly_name: "Locked" },
+        };
+        states["sensor.santa_fe_tire_pressure_front_left"] = {
+          entity_id: "sensor.santa_fe_tire_pressure_front_left",
+          state: "34",
+          attributes: { unit_of_measurement: "psi" },
+        };
+        states["binary_sensor.santa_fe_tire_fl_warn"] = {
+          entity_id: "binary_sensor.santa_fe_tire_fl_warn",
+          state: "on",
+          attributes: {},
+        };
+        return {
+          states,
+          formatEntityState: (s) =>
+            `${s.state}${s.attributes.unit_of_measurement ? " " + s.attributes.unit_of_measurement : ""}`,
+        };
+      }
+
+      const o = (n) => ({ entity: `binary_sensor.santa_fe_${n}_is_open` });
+      const baseOpenings = {
+        door_fl: o("front_left_door"),
+        door_fr: o("front_right_door"),
+        door_rl: o("back_left_door"),
+        door_rr: o("back_right_door"),
+        window_fl: o("front_left_window"),
+        window_fr: o("front_right_window"),
+        window_rl: o("back_left_window"),
+        window_rr: o("back_right_window"),
+        bonnet: o("hood"),
+        boot: o("trunk"),
+      };
+
+      const baseRegions = {
+        left: [
+          { entity: "sensor.santa_fe_fuel_level", name: "Fuel", icon: "mdi:fuel" },
+          { entity: "sensor.santa_fe_odometer", name: "Odometer", icon: "mdi:counter" },
+        ],
+        right: [
+          {
+            entity: "sensor.santa_fe_next_service_distance",
+            name: "Service",
+            icon: "mdi:wrench-clock",
+          },
+          { entity: "binary_sensor.santa_fe_is_locked", name: "Locked", icon: "mdi:lock" },
+        ],
+        below: [{ entity: "sensor.santa_fe_tire_pressure_front_left", name: "Tyre FL" }],
+      };
+
+      const CASES = [
+        {
+          title: "All closed",
+          open: "off",
+          config: { name: "Santa Fe", openings: baseOpenings, regions: baseRegions },
+        },
+        {
+          title: "All open — swing",
+          open: "on",
+          config: {
+            name: "Santa Fe",
+            open_style: "swing",
+            openings: baseOpenings,
+            regions: baseRegions,
+          },
+        },
+        {
+          title: "All open — highlight only",
+          open: "on",
+          config: {
+            name: "Santa Fe",
+            open_style: "highlight",
+            openings: baseOpenings,
+            regions: baseRegions,
+          },
+        },
+        {
+          title: "Unavailable entities",
+          open: "unavailable",
+          config: { name: "Santa Fe", openings: baseOpenings, regions: baseRegions },
+        },
+        {
+          title: "Custom colours + tyres",
+          open: "on",
+          config: {
+            name: "Santa Fe",
+            vehicle: { colors: { body: "blue-grey", accent: "cyan", open: "red" } },
+            openings: baseOpenings,
+            tyres: {
+              fl: {
+                pressure: "sensor.santa_fe_tire_pressure_front_left",
+                warning: "binary_sensor.santa_fe_tire_fl_warn",
+              },
+            },
+            regions: baseRegions,
+          },
+        },
+        {
+          title: "Preview (no entities)",
+          open: "off",
+          config: { name: "Santa Fe" },
+        },
+        {
+          title: "Wide card — flanking regions",
+          open: "on",
+          wide: true,
+          config: {
+            name: "Santa Fe",
+            openings: baseOpenings,
+            tyres: {
+              fl: {
+                pressure: "sensor.santa_fe_tire_pressure_front_left",
+                warning: "binary_sensor.santa_fe_tire_fl_warn",
+              },
+            },
+            regions: baseRegions,
+          },
+        },
+      ];
+
+      const cards = [];
+      const grid = document.getElementById("grid");
+      for (const c of CASES) {
+        const wrap = document.createElement("div");
+        wrap.className = c.wide ? "case wide" : "case";
+        wrap.innerHTML = `<h2>${c.title}</h2>`;
+        const el = document.createElement("car-status-card");
+        el.setConfig({ type: "custom:car-status-card", ...c.config });
+        el.hass = makeHass(c.open);
+        wrap.appendChild(el);
+        grid.appendChild(wrap);
+        cards.push({ el, base: c.open });
+      }
+
+      document.getElementById("theme").onclick = () => document.body.classList.toggle("light");
+
+      let flipped = false;
+      document.getElementById("toggle").onclick = () => {
+        flipped = !flipped;
+        for (const { el, base } of cards) {
+          if (base === "unavailable") continue;
+          el.hass = makeHass(flipped ? (base === "on" ? "off" : "on") : base);
+        }
+      };
+    </script>
+  </body>
+</html>
