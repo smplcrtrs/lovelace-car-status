@@ -65,6 +65,9 @@ tyres:
   fl:
     pressure: sensor.santa_fe_tire_pressure_front_left
     warning: binary_sensor.santa_fe_tire_pressure_front_left_warning_is_on
+  fr: { pressure: ..., warning: ... }
+  rl: { pressure: ..., warning: ... }
+  rr: { pressure: ..., warning: ... }
 
 regions:
   left:
@@ -120,9 +123,14 @@ openings:
 ```yaml
 - entity: sensor.santa_fe_fuel_level
   name: Fuel # defaults to the entity's friendly name
-  icon: mdi:fuel
+  icon: mdi:fuel # optional — see below
   color: amber # tints the icon
 ```
+
+Every row and control shows an icon without you configuring one. The card asks Home Assistant for
+the entity's icon, which resolves in the usual order: the icon you set on the entity, then its
+`device_class`, then a domain default. Setting `icon` here overrides that. Controls with an entity
+get a state-aware icon, so a lock shows locked and unlocked differently.
 
 `display`, `min` and `max` are accepted and reserved for the gauge renderer, but every sensor row
 currently renders as text.
@@ -181,6 +189,15 @@ regions:
 Controls disable themselves when their entity is missing or unavailable, so a car that has gone
 offline can't be sent a command that will silently fail.
 
+#### Tyres
+
+The four tyres are drawn in columns either side of the car rather than tucked under it, so their
+status is legible and there is room for the pressure reading beneath each one. A tyre turns red
+when its `warning` entity is on.
+
+Tyres are only drawn when at least one is configured — otherwise they would be four orphan shapes
+floating beside the car. Configure all four together so the positions read correctly.
+
 ### Layout
 
 Rows in `left` and `right` flank the car on wide cards and stack above and below it once the card
@@ -192,8 +209,9 @@ is narrower than about 460px, so the card stays usable on mobile.
 - [x] Configurable sensor regions
 - [x] Control buttons — lock/unlock, hazards, climate
 - [ ] Graphical configuration editor
+- [x] Tyre pressures and warnings on the graphic
 - [ ] Gauge and bar renderers for levels
-- [ ] Tyre pressures and light/fault indicators on the graphic
+- [ ] Light and fault indicators on the graphic
 
 ## Development
 

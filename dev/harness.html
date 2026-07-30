@@ -134,11 +134,36 @@
 
       class HaIcon extends HTMLElement {
         set icon(v) {
-          this.textContent = "●";
-          this.title = v;
+          this.textContent = v ? "◈" : "●";
+          this.title = v ?? "";
         }
       }
       customElements.define("ha-icon", HaIcon);
+
+      // Mimics the real element's fallback order so the harness shows which
+      // source an icon came from: config > entity attr > device_class > domain.
+      class HaStateIcon extends HTMLElement {
+        set hass(_) {}
+        set icon(v) {
+          this._icon = v;
+          this._render();
+        }
+        set stateObj(v) {
+          this._stateObj = v;
+          this._render();
+        }
+        _render() {
+          const a = this._stateObj?.attributes ?? {};
+          const resolved =
+            this._icon ??
+            a.icon ??
+            (a.device_class ? `device_class:${a.device_class}` : null) ??
+            (this._stateObj ? `domain:${this._stateObj.entity_id.split(".")[0]}` : null);
+          this.textContent = this._icon ? "◈" : resolved ? "◆" : "○";
+          this.title = resolved ?? "no icon";
+        }
+      }
+      customElements.define("ha-state-icon", HaStateIcon);
 
       // ---- Stub hass ----
       const OPENINGS = [
@@ -163,15 +188,25 @@
             attributes: { friendly_name: o },
           };
         }
+        // fuel carries its own icon attribute; odometer has only a device_class,
+        // so between them they exercise two rungs of the fallback ladder.
         states["sensor.santa_fe_fuel_level"] = {
           entity_id: "sensor.santa_fe_fuel_level",
           state: "62",
-          attributes: { friendly_name: "Fuel level", unit_of_measurement: "%" },
+          attributes: {
+            friendly_name: "Fuel level",
+            unit_of_measurement: "%",
+            icon: "mdi:gas-station",
+          },
         };
         states["sensor.santa_fe_odometer"] = {
           entity_id: "sensor.santa_fe_odometer",
           state: "24518",
-          attributes: { friendly_name: "Odometer", unit_of_measurement: "mi" },
+          attributes: {
+            friendly_name: "Odometer",
+            unit_of_measurement: "mi",
+            device_class: "distance",
+          },
         };
         states["sensor.santa_fe_next_service_distance"] = {
           entity_id: "sensor.santa_fe_next_service_distance",
@@ -183,16 +218,25 @@
           state: "off",
           attributes: { friendly_name: "Locked" },
         };
-        states["sensor.santa_fe_tire_pressure_front_left"] = {
-          entity_id: "sensor.santa_fe_tire_pressure_front_left",
-          state: "34",
-          attributes: { unit_of_measurement: "psi" },
+        // fl is deliberately low and warning, the rest are healthy.
+        const tyreData = {
+          fl: ["28", "on"],
+          fr: ["34", "off"],
+          rl: ["33", "off"],
+          rr: ["34", "off"],
         };
-        states["binary_sensor.santa_fe_tire_fl_warn"] = {
-          entity_id: "binary_sensor.santa_fe_tire_fl_warn",
-          state: "on",
-          attributes: {},
-        };
+        for (const [pos, [psi, warn]] of Object.entries(tyreData)) {
+          states[`sensor.santa_fe_tyre_${pos}`] = {
+            entity_id: `sensor.santa_fe_tyre_${pos}`,
+            state: psi,
+            attributes: { unit_of_measurement: "psi", device_class: "pressure" },
+          };
+          states[`binary_sensor.santa_fe_tyre_${pos}_warn`] = {
+            entity_id: `binary_sensor.santa_fe_tyre_${pos}_warn`,
+            state: warn,
+            attributes: { device_class: "problem" },
+          };
+        }
         states["lock.santa_fe_doors"] = {
           entity_id: "lock.santa_fe_doors",
           state: "locked",
@@ -248,20 +292,34 @@
         boot: o("trunk"),
       };
 
+      const baseTyres = Object.fromEntries(
+        ["fl", "fr", "rl", "rr"].map((p) => [
+          p,
+          {
+            pressure: `sensor.santa_fe_tyre_${p}`,
+            warning: `binary_sensor.santa_fe_tyre_${p}_warn`,
+          },
+        ]),
+      );
+
       const baseRegions = {
         left: [
-          { entity: "sensor.santa_fe_fuel_level", name: "Fuel", icon: "mdi:fuel" },
-          { entity: "sensor.santa_fe_odometer", name: "Odometer", icon: "mdi:counter" },
+          // No configured icon: falls back to the entity's own icon attribute.
+          { entity: "sensor.santa_fe_fuel_level", name: "Fuel" },
+          // No icon and no attribute: falls back to device_class.
+          { entity: "sensor.santa_fe_odometer", name: "Odometer" },
         ],
         right: [
+          // Explicit icon wins over everything.
           {
             entity: "sensor.santa_fe_next_service_distance",
             name: "Service",
             icon: "mdi:wrench-clock",
           },
-          { entity: "binary_sensor.santa_fe_is_locked", name: "Locked", icon: "mdi:lock" },
+          // Nothing at all: falls back to the domain default.
+          { entity: "binary_sensor.santa_fe_is_locked", name: "Locked" },
         ],
-        below: [{ entity: "sensor.santa_fe_tire_pressure_front_left", name: "Tyre FL" }],
+        below: [{ entity: "sensor.santa_fe_tyre_fl", name: "Tyre FL" }],
       };
 
       const controlRegions = {
@@ -336,12 +394,7 @@
             name: "Santa Fe",
             vehicle: { colors: { body: "blue-grey", accent: "cyan", open: "red" } },
             openings: baseOpenings,
-            tyres: {
-              fl: {
-                pressure: "sensor.santa_fe_tire_pressure_front_left",
-                warning: "binary_sensor.santa_fe_tire_fl_warn",
-              },
-            },
+            tyres: baseTyres,
             regions: baseRegions,
           },
         },
@@ -363,12 +416,7 @@
           config: {
             name: "Santa Fe",
             openings: baseOpenings,
-            tyres: {
-              fl: {
-                pressure: "sensor.santa_fe_tire_pressure_front_left",
-                warning: "binary_sensor.santa_fe_tire_fl_warn",
-              },
-            },
+            tyres: baseTyres,
             regions: baseRegions,
           },
         },
@@ -393,12 +441,7 @@
             type: "custom:car-status-card",
             open_style: style,
             openings: baseOpenings,
-            tyres: {
-              fl: {
-                pressure: "sensor.santa_fe_tire_pressure_front_left",
-                warning: "binary_sensor.santa_fe_tire_fl_warn",
-              },
-            },
+            tyres: baseTyres,
           };
           g.hass = makeHass(open);
           wrap.appendChild(g);

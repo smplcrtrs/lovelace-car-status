@@ -20,6 +20,7 @@ import {
   TAILLIGHT_L,
   TYRE,
   TYRE_POS,
+  VIEW_BOX,
   VIEW_W,
   WINDSCREEN,
   mirrorPath,
@@ -124,8 +125,8 @@ const renderLid = (
 
 const renderTyre = (ctx: CarArtContext, pos: TyrePos): SVGTemplateResult => {
   const p = TYRE_POS[pos];
-  const label = ctx.tyreLabel(pos);
-  const inboard = pos === "fl" || pos === "rl" ? p.x + TYRE.w + 6 : p.x - 6;
+  const reading = ctx.tyreReading(pos);
+  const baseY = p.y + TYRE.h + 30;
   return svg`
     <g class="tyre" data-pos=${pos} data-state=${ctx.tyreState(pos)}>
       <rect
@@ -137,13 +138,15 @@ const renderTyre = (ctx: CarArtContext, pos: TyrePos): SVGTemplateResult => {
         rx=${TYRE.rx}
       />
       ${
-        label
-          ? svg`<text
-              class="tyre-label"
-              x=${inboard}
-              y=${p.y + TYRE.h / 2 + 6}
-              text-anchor=${pos === "fl" || pos === "rl" ? "start" : "end"}
-            >${label}</text>`
+        reading
+          ? svg`
+            <text class="tyre-value" x=${p.cx} y=${baseY}>${reading.value}</text>
+            ${
+              reading.unit
+                ? svg`<text class="tyre-unit" x=${p.cx} y=${baseY + 22}>${reading.unit}</text>`
+                : null
+            }
+          `
           : null
       }
     </g>
@@ -151,8 +154,7 @@ const renderTyre = (ctx: CarArtContext, pos: TyrePos): SVGTemplateResult => {
 };
 
 const render = (ctx: CarArtContext): SVGTemplateResult => svg`
-  <!-- Tyres sit beneath the body so only the sidewalls show, as from above. -->
-  ${TYRES.map((t) => renderTyre(ctx, t))}
+  ${ctx.showTyres ? TYRES.map((t) => renderTyre(ctx, t)) : null}
 
   <g class="chassis">
     <path class="body" d=${BODY} />
@@ -185,7 +187,7 @@ const render = (ctx: CarArtContext): SVGTemplateResult => svg`
 export const suvArt: CarArt = {
   id: "suv",
   label: "SUV",
-  viewBox: "0 0 303 643",
+  viewBox: VIEW_BOX,
   panels: PANELS,
   tyres: TYRES,
   render,

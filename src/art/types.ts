@@ -26,11 +26,22 @@ export const PANEL_KIND: Record<PanelId, PanelKind> = {
 export type PanelState = "closed" | "open" | "unknown" | "unavailable";
 export type TyreState = "ok" | "warn" | "unknown" | "unavailable";
 
+export interface TyreReading {
+  value: string;
+  unit?: string;
+}
+
 /** Passed into artwork so panels render their own state declaratively. */
 export interface CarArtContext {
   panelState(id: PanelId): PanelState;
   tyreState(pos: TyrePos): TyreState;
-  tyreLabel(pos: TyrePos): string | undefined;
+  tyreReading(pos: TyrePos): TyreReading | undefined;
+  /**
+   * False when no tyre is configured at all. The tyres sit outboard of the
+   * body, so drawing them with nothing to report leaves orphan shapes floating
+   * beside the car.
+   */
+  showTyres: boolean;
 }
 
 /**

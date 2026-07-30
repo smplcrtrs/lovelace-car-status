@@ -136,13 +136,13 @@ const renderDoor = (ctx: CarArtContext, d: DoorGeom): SVGTemplateResult => {
 
 const renderTyre = (ctx: CarArtContext, pos: TyrePos): SVGTemplateResult => {
   const p = TYRE_POS[pos];
-  const label = ctx.tyreLabel(pos);
+  const label = ctx.tyreReading(pos)?.value;
   return svg`
     <g class="tyre" data-pos=${pos} data-state=${ctx.tyreState(pos)}>
       <rect class="tyre-body" x=${p.x} y=${p.y} width=${TYRE.w} height=${TYRE.h} rx="7" />
       ${
         label
-          ? svg`<text class="tyre-label" x=${p.x + TYRE.w / 2} y=${p.y + TYRE.h + 15}>${label}</text>`
+          ? svg`<text class="tyre-value" x=${p.x + TYRE.w / 2} y=${p.y + TYRE.h + 15}>${label}</text>`
           : null
       }
     </g>
@@ -182,7 +182,7 @@ const render = (ctx: CarArtContext): SVGTemplateResult => svg`
   ${renderLid(ctx, "bonnet", BONNET)}
   ${renderLid(ctx, "boot", BOOT)}
   ${DOORS.map((d) => renderDoor(ctx, d))}
-  ${TYRES.map((t) => renderTyre(ctx, t))}
+  ${ctx.showTyres ? TYRES.map((t) => renderTyre(ctx, t)) : null}
 `;
 
 export const placeholderArt: CarArt = {

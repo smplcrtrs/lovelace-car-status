@@ -108,8 +108,21 @@ export class CsControlButton extends LitElement {
     const stateObj = this._stateObj();
     const name =
       this.item.name ?? stateObj?.attributes.friendly_name ?? this.item.entity ?? this.item.type;
-    const icon = this.item.icon ?? DEFAULT_ICON[this.item.type] ?? "mdi:car";
     const color = this.item.color ? computeCssColor(this.item.color) : undefined;
+
+    // With an entity, ha-state-icon picks a state-aware icon (a lock shows
+    // open vs closed). Without one, only the control type tells us anything.
+    const icon = stateObj
+      ? html`<ha-state-icon
+          class="icon"
+          .hass=${this.hass}
+          .stateObj=${stateObj}
+          .icon=${this.item.icon}
+        ></ha-state-icon>`
+      : html`<ha-icon
+          class="icon"
+          .icon=${this.item.icon ?? DEFAULT_ICON[this.item.type] ?? "mdi:car"}
+        ></ha-icon>`;
 
     return html`
       <div
@@ -119,7 +132,7 @@ export class CsControlButton extends LitElement {
         style=${color ? `--control-accent:${color}` : ""}
       >
         <button class="main" ?disabled=${this._unavailable} @click=${this._activate} title=${name}>
-          <ha-icon class="icon" .icon=${icon}></ha-icon>
+          ${icon}
           <span class="label">${name}</span>
         </button>
         ${this.item.type === "climate" ? this._renderClimate() : nothing}

@@ -38,15 +38,14 @@ export class CsSensorRow extends LitElement {
 
     return html`
       <button class="row" @click=${this._showMoreInfo} title=${name}>
-        ${
-          this.item.icon
-            ? html`<ha-icon
-                class="icon"
-                .icon=${this.item.icon}
-                style=${color ? `color:${color}` : ""}
-              ></ha-icon>`
-            : nothing
-        }
+        <!-- ha-state-icon resolves config icon > entity icon > device_class > domain. -->
+        <ha-state-icon
+          class="icon"
+          .hass=${this.hass}
+          .stateObj=${stateObj}
+          .icon=${this.item.icon}
+          style=${color ? `color:${color}` : ""}
+        ></ha-state-icon>
         <span class="name">${name}</span>
         <span class="value">${value}</span>
       </button>

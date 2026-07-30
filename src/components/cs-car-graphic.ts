@@ -31,6 +31,7 @@ export class CsCarGraphic extends LitElement {
     const openings = this.config.openings ?? {};
     const tyres = this.config.tyres ?? {};
     return {
+      showTyres: Object.values(tyres).some((t) => t?.pressure || t?.warning),
       panelState: (id: PanelId) => panelStateFor(this.hass, openings[id]),
       tyreState: (pos: TyrePos) => {
         const warning = tyres[pos]?.warning;
@@ -40,12 +41,12 @@ export class CsCarGraphic extends LitElement {
         if (stateObj.state === "unknown") return "unknown";
         return stateObj.state === "on" ? "warn" : "ok";
       },
-      tyreLabel: (pos: TyrePos) => {
+      tyreReading: (pos: TyrePos) => {
         const pressure = tyres[pos]?.pressure;
         if (!pressure || !this.hass) return undefined;
         const stateObj = this.hass.states[pressure] as HassEntity | undefined;
         if (!stateObj || Number.isNaN(Number(stateObj.state))) return undefined;
-        return stateObj.state;
+        return { value: stateObj.state, unit: stateObj.attributes.unit_of_measurement };
       },
     };
   }
@@ -82,7 +83,7 @@ export class CsCarGraphic extends LitElement {
       display: block;
       width: 100%;
       height: 100%;
-      max-height: var(--car-max-height, 320px);
+      max-height: var(--car-max-height, 380px);
       margin: 0 auto;
       overflow: visible;
     }
@@ -196,22 +197,36 @@ export class CsCarGraphic extends LitElement {
 
     /* ---- tyres ---- */
     .tyre-body {
-      fill: #2b2b2b;
-      transition: fill 0.3s ease;
+      fill: #33383d;
+      stroke: var(--car-line);
+      stroke-width: 1.5;
+      transition:
+        fill 0.3s ease,
+        stroke 0.3s ease;
+    }
+    .tyre[data-state="ok"] .tyre-body {
+      stroke: var(--car-ok);
     }
     .tyre[data-state="warn"] .tyre-body {
       fill: var(--car-fault);
-      opacity: 1;
+      stroke: color-mix(in srgb, var(--car-fault) 55%, #000);
     }
     .tyre[data-state="unavailable"] .tyre-body {
       fill: var(--disabled-color, #6f6f6f);
     }
-    .tyre-label {
-      fill: var(--secondary-text-color, #9b9b9b);
-      font-size: 15px;
+    .tyre-value {
+      fill: var(--primary-text-color, #e1e1e1);
+      font-size: 34px;
+      font-weight: 600;
       text-anchor: middle;
     }
-    .tyre[data-state="warn"] .tyre-label {
+    .tyre-unit {
+      fill: var(--secondary-text-color, #9b9b9b);
+      font-size: 22px;
+      text-anchor: middle;
+    }
+    .tyre[data-state="warn"] .tyre-value,
+    .tyre[data-state="warn"] .tyre-unit {
       fill: var(--car-fault);
     }
 

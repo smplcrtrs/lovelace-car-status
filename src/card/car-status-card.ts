@@ -88,8 +88,9 @@ export class CarStatusCard extends LitElement implements LovelaceCard {
       align-items: center;
       gap: 8px;
     }
+    /* The graphic includes the tyre columns, so it needs the larger share. */
     .middle cs-car-graphic {
-      flex: 1 1 40%;
+      flex: 1 1 46%;
       min-width: 0;
     }
     .region {

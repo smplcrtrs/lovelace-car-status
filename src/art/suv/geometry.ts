@@ -63,11 +63,29 @@ export const MIRROR_L = "M29,232C19,227,8,229,6,236C4,242,10,247,18,248C25,249,2
 export const HEADLIGHT_L = "M64,32C76,26,92,23,104,22L108,38C96,39,82,42,71,46Z";
 export const TAILLIGHT_L = "M62,624C74,628,90,630,103,631L106,616C94,615,80,612,69,608Z";
 
-/** Tyres sit mostly under the body; only the outer sidewall shows. */
-export const TYRE = { w: 30, h: 62, rx: 8 };
+/**
+ * Tyres sit in margin columns either side of the body rather than tucked under
+ * it, so their status is legible and there is room for a pressure reading. The
+ * viewBox is extended outwards to make those columns; the car keeps its
+ * original coordinates.
+ */
+export const MARGIN = 88;
+export const VIEW_BOX = `${-MARGIN} 0 ${VIEW_W + MARGIN * 2} 643`;
+
+const LEFT_COL_CX = (-MARGIN + 28) / 2;
+const RIGHT_COL_CX = (275 + VIEW_W + MARGIN) / 2;
+
+export const TYRE = { w: 26, h: 62, rx: 9 };
+
+/** Axle centres: front under the engine bay, rear behind the cabin. */
+const FRONT_AXLE_Y = 120;
+const REAR_AXLE_Y = 452;
+
+const col = (cx: number, y: number) => ({ x: cx - TYRE.w / 2, y, cx });
+
 export const TYRE_POS = {
-  fl: { x: 17, y: 120 },
-  rl: { x: 17, y: 452 },
-  fr: { x: VIEW_W - 17 - TYRE.w, y: 120 },
-  rr: { x: VIEW_W - 17 - TYRE.w, y: 452 },
+  fl: col(LEFT_COL_CX, FRONT_AXLE_Y),
+  rl: col(LEFT_COL_CX, REAR_AXLE_Y),
+  fr: col(RIGHT_COL_CX, FRONT_AXLE_Y),
+  rr: col(RIGHT_COL_CX, REAR_AXLE_Y),
 } as const;
