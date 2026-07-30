@@ -3,13 +3,17 @@ import { customElement, property, state } from "lit/decorators.js";
 import { CARD_NAME } from "../const";
 import type { HomeAssistant, LovelaceCard, LovelaceGridOptions } from "../ha";
 import {
+  isControl,
   validateConfig,
   type CarStatusCardConfig,
+  type ControlItemConfig,
+  type RegionItemConfig,
   type RegionName,
   type SensorItemConfig,
 } from "./car-status-card-config";
 import "../components/cs-car-graphic";
 import "../components/cs-sensor-row";
+import "../components/cs-control-button";
 
 @customElement(CARD_NAME)
 export class CarStatusCard extends LitElement implements LovelaceCard {
@@ -29,19 +33,24 @@ export class CarStatusCard extends LitElement implements LovelaceCard {
     return { columns: 6, min_columns: 4, min_rows: 6, rows: 9 };
   }
 
-  private _items(region: RegionName): SensorItemConfig[] {
+  private _items(region: RegionName): RegionItemConfig[] {
     return this._config?.regions?.[region] ?? [];
+  }
+
+  private _renderItem(item: RegionItemConfig) {
+    return isControl(item)
+      ? html`<cs-control-button
+          .hass=${this.hass}
+          .item=${item as ControlItemConfig}
+        ></cs-control-button>`
+      : html`<cs-sensor-row .hass=${this.hass} .item=${item as SensorItemConfig}></cs-sensor-row>`;
   }
 
   private _renderRegion(region: RegionName) {
     const items = this._items(region);
     if (!items.length) return nothing;
     return html`
-      <div class="region region-${region}">
-        ${items.map(
-          (item) => html`<cs-sensor-row .hass=${this.hass} .item=${item}></cs-sensor-row>`,
-        )}
-      </div>
+      <div class="region region-${region}">${items.map((item) => this._renderItem(item))}</div>
     `;
   }
 
@@ -92,6 +101,18 @@ export class CarStatusCard extends LitElement implements LovelaceCard {
     .region-left,
     .region-right {
       flex: 1 1 30%;
+    }
+    /* Above and below run across the card, so controls form a button row. */
+    .region-above,
+    .region-below {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .region-above > *,
+    .region-below > * {
+      flex: 1 1 140px;
+      min-width: 0;
     }
 
     /* Flanking columns need somewhere to go once the card gets narrow. */

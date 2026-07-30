@@ -7,8 +7,8 @@ regions around the graphic.
 Integration-agnostic — every entity is chosen by you. Developed against
 [Kia/Hyundai Connect](https://github.com/Hyundai-Kia-Connect/kia_uvo), but nothing is tied to it.
 
-> **Status: early.** The card renders and reacts to state, configured by YAML. The graphical
-> editor, gauges and control buttons are not built yet — see [Roadmap](#roadmap).
+> **Status: early.** The card renders, reacts to state and runs controls, all configured by YAML.
+> The graphical editor and gauges are not built yet — see [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -124,8 +124,62 @@ openings:
   color: amber # tints the icon
 ```
 
-`display`, `min` and `max` are accepted and reserved for the gauge renderer, but every row
+`display`, `min` and `max` are accepted and reserved for the gauge renderer, but every sensor row
 currently renders as text.
+
+#### Controls
+
+A region item with a `type` other than `sensor` renders as a control instead of a readout. Put
+them in `above` or `below` and they lay out as a button row.
+
+```yaml
+regions:
+  below:
+    - type: lock # presses lock.lock / lock.unlock depending on current state
+      entity: lock.santa_fe_doors
+      name: Doors
+      icon: mdi:car-door-lock
+
+    - type: toggle # homeassistant.toggle — switches, lights
+      entity: switch.santa_fe_hazards
+      name: Hazards
+      icon: mdi:hazard-lights
+      color: red
+
+    - type: button # button.press
+      entity: button.santa_fe_force_update
+      name: Refresh
+
+    - type: action # any Home Assistant action
+      name: Flash lights
+      icon: mdi:car-light-high
+      confirm: Flash the lights?
+      tap_action:
+        action: perform-action
+        perform_action: kia_uvo.start_hazard_lights
+        target:
+          device_id: your_car_device_id
+
+  above:
+    - type: climate # −/+ setpoint stepper via climate.set_temperature
+      entity: climate.santa_fe
+      name: Climate
+      min: 16
+      max: 30
+      step: 0.5
+```
+
+| Control key               | Applies to          | Description                                              |
+| ------------------------- | ------------------- | -------------------------------------------------------- |
+| `type`                    | all                 | `lock`, `toggle`, `button`, `climate` or `action`.       |
+| `entity`                  | all but `action`    | The entity to drive.                                     |
+| `name` / `icon` / `color` | all                 | Label, icon, and accent colour when active.              |
+| `confirm`                 | all                 | Prompt with this text before acting.                     |
+| `tap_action`              | `action`, `climate` | Standard HA action config. Required for `action`.        |
+| `min` / `max` / `step`    | `climate`           | Setpoint bounds. Default to the entity's own attributes. |
+
+Controls disable themselves when their entity is missing or unavailable, so a car that has gone
+offline can't be sent a command that will silently fail.
 
 ### Layout
 
@@ -136,10 +190,10 @@ is narrower than about 460px, so the card stays usable on mobile.
 
 - [x] Car graphic with door, window, bonnet and boot state
 - [x] Configurable sensor regions
+- [x] Control buttons — lock/unlock, hazards, climate
 - [ ] Graphical configuration editor
 - [ ] Gauge and bar renderers for levels
 - [ ] Tyre pressures and light/fault indicators on the graphic
-- [ ] Control buttons — lock/unlock, hazards, climate
 
 ## Development
 

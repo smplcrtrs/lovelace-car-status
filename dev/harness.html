@@ -91,6 +91,18 @@
       <button id="toggle">Toggle all panels</button>
     </div>
     <div class="grid" id="grid"></div>
+    <h2 style="font-size: 13px; margin: 20px 0 4px">Service calls</h2>
+    <pre
+      id="log"
+      style="
+        background: var(--card-background-color);
+        padding: 10px;
+        border-radius: 8px;
+        min-height: 60px;
+        font-size: 12px;
+        overflow-x: auto;
+      "
+    ></pre>
 
     <script type="module">
       import "../dist/car-status.js";
@@ -181,10 +193,44 @@
           state: "on",
           attributes: {},
         };
+        states["lock.santa_fe_doors"] = {
+          entity_id: "lock.santa_fe_doors",
+          state: "locked",
+          attributes: { friendly_name: "Doors" },
+        };
+        states["switch.santa_fe_hazards"] = {
+          entity_id: "switch.santa_fe_hazards",
+          state: "off",
+          attributes: { friendly_name: "Hazards" },
+        };
+        states["climate.santa_fe"] = {
+          entity_id: "climate.santa_fe",
+          state: "off",
+          attributes: {
+            friendly_name: "Climate",
+            temperature: 21,
+            min_temp: 16,
+            max_temp: 30,
+            target_temp_step: 0.5,
+          },
+        };
+        states["button.santa_fe_force_update"] = {
+          entity_id: "button.santa_fe_force_update",
+          state: "unknown",
+          attributes: { friendly_name: "Refresh" },
+        };
         return {
           states,
           formatEntityState: (s) =>
             `${s.state}${s.attributes.unit_of_measurement ? " " + s.attributes.unit_of_measurement : ""}`,
+          callService: (domain, service, data, target) => {
+            const line = `${domain}.${service} ${JSON.stringify(data ?? {})}${
+              target ? " target=" + JSON.stringify(target) : ""
+            }`;
+            const log = document.getElementById("log");
+            log.textContent = line + "\n" + log.textContent;
+            return Promise.resolve();
+          },
         };
       }
 
@@ -216,6 +262,40 @@
           { entity: "binary_sensor.santa_fe_is_locked", name: "Locked", icon: "mdi:lock" },
         ],
         below: [{ entity: "sensor.santa_fe_tire_pressure_front_left", name: "Tyre FL" }],
+      };
+
+      const controlRegions = {
+        left: baseRegions.left,
+        right: baseRegions.right,
+        below: [
+          { type: "lock", entity: "lock.santa_fe_doors", name: "Doors", icon: "mdi:car-door-lock" },
+          {
+            type: "toggle",
+            entity: "switch.santa_fe_hazards",
+            name: "Hazards",
+            icon: "mdi:hazard-lights",
+            color: "red",
+          },
+          {
+            type: "button",
+            entity: "button.santa_fe_force_update",
+            name: "Refresh",
+            icon: "mdi:refresh",
+          },
+          {
+            type: "action",
+            name: "Flash",
+            icon: "mdi:car-light-high",
+            tap_action: {
+              action: "perform-action",
+              perform_action: "kia_uvo.start_hazard_lights",
+              target: { device_id: "abc123" },
+            },
+          },
+        ],
+        above: [
+          { type: "climate", entity: "climate.santa_fe", name: "Climate", icon: "mdi:thermostat" },
+        ],
       };
 
       const CASES = [
@@ -269,6 +349,12 @@
           title: "Preview (no entities)",
           open: "off",
           config: { name: "Santa Fe" },
+        },
+        {
+          title: "Controls",
+          open: "off",
+          wide: true,
+          config: { name: "Santa Fe", openings: baseOpenings, regions: controlRegions },
         },
         {
           title: "Wide card — flanking regions",
