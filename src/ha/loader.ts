@@ -6,12 +6,14 @@
 export const loadHaComponents = (): void => {
   try {
     if (!customElements.get("ha-form")) {
-      (customElements.get("hui-tile-card") as { getConfigElement?: () => unknown } | undefined)
-        ?.getConfigElement?.();
+      (
+        customElements.get("hui-tile-card") as { getConfigElement?: () => unknown } | undefined
+      )?.getConfigElement?.();
     }
     if (!customElements.get("ha-entity-picker")) {
-      (customElements.get("hui-entities-card") as { getConfigElement?: () => unknown } | undefined)
-        ?.getConfigElement?.();
+      (
+        customElements.get("hui-entities-card") as { getConfigElement?: () => unknown } | undefined
+      )?.getConfigElement?.();
     }
   } catch {
     // Non-fatal: the editor still renders, just with unstyled fallbacks.

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Car artwork review</title>
+    <style>
+      :root {
+        --primary-text-color: #e1e1e1;
+        --secondary-text-color: #9b9b9b;
+        --card-background-color: #1c1c1c;
+        --secondary-background-color: #282828;
+        --disabled-color: #6f6f6f;
+        --primary-color: #03a9f4;
+        --red-color: #f44336;
+        --amber-color: #ffc107;
+        --green-color: #4caf50;
+        --grey-color: #9e9e9e;
+        --blue-grey-color: #607d8b;
+        --cyan-color: #00bcd4;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--card-background-color);
+        color: var(--primary-text-color);
+        font-family: system-ui, sans-serif;
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+      }
+      figure {
+        margin: 0;
+        flex: 0 0 auto;
+      }
+      figcaption {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--secondary-text-color);
+        margin-bottom: 8px;
+      }
+      cs-car-graphic {
+        display: block;
+        width: 300px;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      import "../dist/car-status.js";
+
+      const OPENINGS = [
+        "front_left_door",
+        "front_right_door",
+        "back_left_door",
+        "back_right_door",
+        "front_left_window",
+        "front_right_window",
+        "back_left_window",
+        "back_right_window",
+        "hood",
+        "trunk",
+      ];
+
+      const makeHass = (state) => {
+        const states = {};
+        for (const o of OPENINGS) {
+          states[`binary_sensor.${o}`] = { entity_id: o, state, attributes: {} };
+        }
+        states["sensor.tyre_fl"] = { entity_id: "t", state: "34", attributes: {} };
+        states["binary_sensor.tyre_fl_warn"] = { entity_id: "w", state: "on", attributes: {} };
+        return { states };
+      };
+
+      const openings = {
+        door_fl: { entity: "binary_sensor.front_left_door" },
+        door_fr: { entity: "binary_sensor.front_right_door" },
+        door_rl: { entity: "binary_sensor.back_left_door" },
+        door_rr: { entity: "binary_sensor.back_right_door" },
+        window_fl: { entity: "binary_sensor.front_left_window" },
+        window_fr: { entity: "binary_sensor.front_right_window" },
+        window_rl: { entity: "binary_sensor.back_left_window" },
+        window_rr: { entity: "binary_sensor.back_right_window" },
+        bonnet: { entity: "binary_sensor.hood" },
+        boot: { entity: "binary_sensor.trunk" },
+      };
+
+      const CASES = [
+        ["Closed", "off", "swing", {}],
+        ["Open — swing", "on", "swing", {}],
+      ];
+
+      for (const [label, state, style, colors] of CASES) {
+        const fig = document.createElement("figure");
+        fig.innerHTML = `<figcaption>${label}</figcaption>`;
+        const g = document.createElement("cs-car-graphic");
+        g.style.setProperty("--car-max-height", "760px");
+        g.config = {
+          type: "custom:car-status-card",
+          open_style: style,
+          vehicle: { colors },
+          openings,
+          tyres: { fl: { pressure: "sensor.tyre_fl", warning: "binary_sensor.tyre_fl_warn" } },
+        };
+        g.hass = makeHass(state);
+        fig.appendChild(g);
+        document.body.appendChild(fig);
+      }
+    </script>
+  </body>
+</html>

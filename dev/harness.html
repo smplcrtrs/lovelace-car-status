@@ -288,6 +288,39 @@
         },
       ];
 
+      // ?big renders just the graphic, large, for judging the artwork.
+      if (new URLSearchParams(location.search).has("big")) {
+        document.getElementById("controls").remove();
+        const host = document.getElementById("grid");
+        host.style.gridTemplateColumns = "repeat(3, 1fr)";
+        for (const [label, open, style] of [
+          ["Closed", "off", "swing"],
+          ["Open — swing", "on", "swing"],
+          ["Open — highlight", "on", "highlight"],
+        ]) {
+          const wrap = document.createElement("div");
+          wrap.className = "case";
+          wrap.innerHTML = `<h2>${label}</h2>`;
+          const g = document.createElement("cs-car-graphic");
+          g.style.setProperty("--car-max-height", "820px");
+          g.config = {
+            type: "custom:car-status-card",
+            open_style: style,
+            openings: baseOpenings,
+            tyres: {
+              fl: {
+                pressure: "sensor.santa_fe_tire_pressure_front_left",
+                warning: "binary_sensor.santa_fe_tire_fl_warn",
+              },
+            },
+          };
+          g.hass = makeHass(open);
+          wrap.appendChild(g);
+          host.appendChild(wrap);
+        }
+        throw new Error("big mode");
+      }
+
       const cards = [];
       const grid = document.getElementById("grid");
       for (const c of CASES) {

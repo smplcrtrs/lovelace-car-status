@@ -87,18 +87,44 @@ export class CsCarGraphic extends LitElement {
       overflow: visible;
     }
 
+    /* Outline derived from the body colour so any body colour keeps its edges. */
+    svg {
+      --car-line: color-mix(in srgb, var(--car-body) 45%, #000);
+      --car-shade: color-mix(in srgb, var(--car-body) 82%, #000);
+      --car-glass: color-mix(in srgb, var(--car-body) 55%, #4a6b82);
+    }
+
     /* ---- chassis ---- */
     .body {
-      fill: var(--car-body);
-      opacity: 0.55;
+      fill: var(--car-shade);
+      stroke: var(--car-line);
+      stroke-width: 2;
     }
     .aperture {
-      fill: var(--card-background-color, #1c1c1c);
+      fill: color-mix(in srgb, var(--car-body) 30%, #000);
     }
-    .roof,
-    .windscreen {
+    .roof {
       fill: var(--car-body);
+      stroke: var(--car-line);
+      stroke-width: 1.5;
+    }
+    .windscreen {
+      fill: var(--car-glass);
+      stroke: var(--car-line);
+      stroke-width: 1.5;
+    }
+    .lamp {
+      fill: #f3e3b8;
       opacity: 0.85;
+    }
+    .lamp.tail {
+      fill: var(--car-fault);
+      opacity: 0.75;
+    }
+    .mirror {
+      fill: var(--car-shade);
+      stroke: var(--car-line);
+      stroke-width: 1.5;
     }
 
     /* ---- panels ---- */
@@ -108,17 +134,16 @@ export class CsCarGraphic extends LitElement {
     }
     .panel-edge {
       fill: none;
-      stroke: var(--car-accent);
-      stroke-width: 1;
-      opacity: 0.5;
+      stroke: var(--car-line);
+      stroke-width: 1.5;
       transition:
         stroke 0.3s ease,
-        stroke-width 0.3s ease,
-        opacity 0.3s ease;
+        stroke-width 0.3s ease;
     }
     .glass {
-      fill: var(--car-accent);
-      opacity: 0.28;
+      fill: var(--car-glass);
+      stroke: var(--car-line);
+      stroke-width: 1;
       transition:
         fill 0.3s ease,
         opacity 0.3s ease;
@@ -128,9 +153,8 @@ export class CsCarGraphic extends LitElement {
       fill: var(--car-open);
     }
     .panel[data-state="open"] .panel-edge {
-      stroke: var(--car-open);
-      stroke-width: 2.5;
-      opacity: 1;
+      stroke: color-mix(in srgb, var(--car-open) 55%, #000);
+      stroke-width: 2;
     }
     .panel[data-state="unavailable"] .panel-fill {
       fill: var(--disabled-color, #6f6f6f);
@@ -172,8 +196,7 @@ export class CsCarGraphic extends LitElement {
 
     /* ---- tyres ---- */
     .tyre-body {
-      fill: var(--car-body);
-      opacity: 0.8;
+      fill: #2b2b2b;
       transition: fill 0.3s ease;
     }
     .tyre[data-state="warn"] .tyre-body {

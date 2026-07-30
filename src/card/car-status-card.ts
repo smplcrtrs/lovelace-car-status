@@ -95,7 +95,7 @@ export class CarStatusCard extends LitElement implements LovelaceCard {
     }
 
     /* Flanking columns need somewhere to go once the card gets narrow. */
-    @container (max-width: 380px) {
+    @container (max-width: 460px) {
       .middle {
         flex-direction: column;
         align-items: stretch;
