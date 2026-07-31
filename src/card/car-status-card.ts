@@ -1,7 +1,8 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { CARD_NAME } from "../const";
-import type { HomeAssistant, LovelaceCard, LovelaceGridOptions } from "../ha";
+import { CARD_NAME, EDITOR_NAME } from "../const";
+import type { HomeAssistant, LovelaceCard, LovelaceCardEditor, LovelaceGridOptions } from "../ha";
+import { buildStubConfig } from "./stub-config";
 import {
   isControl,
   validateConfig,
@@ -20,6 +21,15 @@ export class CarStatusCard extends LitElement implements LovelaceCard {
   @property({ attribute: false }) public hass?: HomeAssistant;
   @property({ type: Boolean }) public preview = false;
   @state() private _config?: CarStatusCardConfig;
+
+  /** The editor element is registered by the bundle entry point. */
+  public static getConfigElement(): LovelaceCardEditor {
+    return document.createElement(EDITOR_NAME) as LovelaceCardEditor;
+  }
+
+  public static getStubConfig(hass: HomeAssistant): CarStatusCardConfig {
+    return buildStubConfig(hass, CARD_NAME);
+  }
 
   public setConfig(config: CarStatusCardConfig): void {
     this._config = validateConfig(config);

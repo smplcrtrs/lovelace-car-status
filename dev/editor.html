@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Car Status Card — editor harness</title>
+    <style>
+      :root {
+        --primary-text-color: #e1e1e1;
+        --secondary-text-color: #9b9b9b;
+        --card-background-color: #1c1c1c;
+        --secondary-background-color: #282828;
+        --divider-color: rgba(255, 255, 255, 0.12);
+        --primary-color: #03a9f4;
+        --error-color: #db4437;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        padding: 20px;
+        background: var(--secondary-background-color);
+        color: var(--primary-text-color);
+        font-family: system-ui, sans-serif;
+        display: grid;
+        grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+      h2 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--secondary-text-color);
+        margin: 0 0 8px;
+      }
+      #editor-host,
+      pre {
+        background: var(--card-background-color);
+        border: 1px solid var(--divider-color);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      pre {
+        font-size: 12px;
+        overflow: auto;
+        max-height: 46vh;
+        margin: 0 0 16px;
+      }
+      .pass {
+        color: #4caf50;
+      }
+      .fail {
+        color: #f44336;
+        font-weight: 700;
+      }
+      details {
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        padding: 6px 8px;
+        margin: 4px 0;
+      }
+      summary {
+        cursor: pointer;
+        font-size: 13px;
+      }
+      label {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+        margin: 3px 0;
+      }
+      label span {
+        flex: 0 0 45%;
+        color: var(--secondary-text-color);
+      }
+      input,
+      select {
+        flex: 1;
+        min-width: 0;
+        background: #111;
+        color: inherit;
+        border: 1px solid var(--divider-color);
+        border-radius: 5px;
+        padding: 3px 6px;
+        font-size: 12px;
+      }
+      button {
+        background: var(--card-background-color);
+        color: inherit;
+        border: 1px solid var(--divider-color);
+        border-radius: 6px;
+        padding: 3px 8px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h2>Editor</h2>
+      <div id="editor-host"></div>
+    </div>
+    <div>
+      <h2>Emitted config</h2>
+      <pre id="out">—</pre>
+      <h2>Round-trip assertions</h2>
+      <pre id="results">running…</pre>
+    </div>
+
+    <script type="module">
+      import "../dist/car-status.js";
+
+      /* ---------------------------------------------------------------
+         Stubs. ha-form is modelled on the real element's semantics:
+         a named entry reads/writes nested under its name unless flattened,
+         and every change merges into existing data rather than replacing it.
+         Getting this wrong here would invalidate the assertions below.
+      ---------------------------------------------------------------- */
+      const getValue = (obj, item) =>
+        obj ? (!item.name || item.flatten ? obj : obj[item.name]) : undefined;
+
+      class HaForm extends HTMLElement {
+        set hass(v) {
+          this._hass = v;
+        }
+        set computeLabel(v) {
+          this._computeLabel = v;
+        }
+        set schema(v) {
+          this._schema = v;
+          this._render();
+        }
+        set data(v) {
+          this._data = v ?? {};
+          this._render();
+        }
+        get data() {
+          return this._data;
+        }
+
+        _emit(schema, value) {
+          const merged = !schema.name || schema.flatten ? value : { [schema.name]: value };
+          this._data = { ...this._data, ...merged };
+          this.dispatchEvent(
+            new CustomEvent("value-changed", {
+              detail: { value: this._data },
+              bubbles: true,
+              composed: true,
+            }),
+          );
+        }
+
+        _render() {
+          if (!this._schema) return;
+          this.innerHTML = "";
+          for (const item of this._schema) {
+            const label = this._computeLabel?.(item) ?? item.label ?? item.name;
+
+            if (item.type === "expandable" || item.type === "grid") {
+              const box = document.createElement(item.type === "grid" ? "div" : "details");
+              if (item.type === "expandable") {
+                const s = document.createElement("summary");
+                s.textContent = item.title ?? label;
+                box.appendChild(s);
+              }
+              const inner = document.createElement("ha-form");
+              inner.computeLabel = this._computeLabel;
+              inner.hass = this._hass;
+              inner.schema = item.schema;
+              inner.data = getValue(this._data, item) ?? {};
+              inner.addEventListener("value-changed", (ev) => {
+                ev.stopPropagation();
+                this._emit(item, ev.detail.value);
+              });
+              box.appendChild(inner);
+              this.appendChild(box);
+              continue;
+            }
+
+            const row = document.createElement("label");
+            const name = document.createElement("span");
+            name.textContent = label;
+            row.appendChild(name);
+
+            const sel = item.selector ?? {};
+            let field;
+            if (sel.select) {
+              field = document.createElement("select");
+              const blank = document.createElement("option");
+              blank.value = "";
+              blank.textContent = "—";
+              field.appendChild(blank);
+              for (const opt of sel.select.options) {
+                const o = document.createElement("option");
+                o.value = opt.value ?? opt;
+                o.textContent = opt.label ?? opt;
+                field.appendChild(o);
+              }
+            } else {
+              field = document.createElement("input");
+              if (sel.number) field.type = "number";
+            }
+            field.value = this._data?.[item.name] ?? "";
+            field.dataset.path = item.name;
+            field.addEventListener("change", () => {
+              const raw = field.value;
+              const value = sel.number && raw !== "" ? Number(raw) : raw;
+              this._emit(item, value);
+            });
+            row.appendChild(field);
+            this.appendChild(row);
+          }
+        }
+      }
+      customElements.define("ha-form", HaForm);
+
+      class HaExpansionPanel extends HTMLElement {
+        set header(v) {
+          this._header = v;
+          this._render();
+        }
+        connectedCallback() {
+          this._render();
+        }
+        _render() {
+          if (this._done) return;
+          this._done = true;
+          const d = document.createElement("details");
+          const s = document.createElement("summary");
+          s.textContent = this._header ?? "";
+          const slotHeader = this.querySelector('[slot="header"]');
+          if (slotHeader) s.textContent = slotHeader.textContent.trim();
+          d.appendChild(s);
+          while (this.firstChild) d.appendChild(this.firstChild);
+          this.appendChild(d);
+        }
+      }
+      customElements.define("ha-expansion-panel", HaExpansionPanel);
+
+      class HaIconButton extends HTMLElement {
+        set path(v) {
+          this.textContent = this.getAttribute("label") ?? "•";
+        }
+        set disabled(v) {
+          this.style.opacity = v ? 0.35 : 1;
+          this._disabled = v;
+        }
+      }
+      customElements.define("ha-icon-button", HaIconButton);
+
+      class HaIcon extends HTMLElement {
+        set icon(v) {
+          this.textContent = "◈";
+        }
+      }
+      customElements.define("ha-icon", HaIcon);
+      class HaStateIcon extends HTMLElement {
+        set hass(v) {}
+        set stateObj(v) {}
+        set icon(v) {}
+      }
+      customElements.define("ha-state-icon", HaStateIcon);
+      customElements.define("ha-button", class extends HTMLElement {});
+
+      /* ---------------------------------------------------------------
+         Harness
+      ---------------------------------------------------------------- */
+      const hass = {
+        states: {
+          "binary_sensor.santa_fe_hood_is_open": {
+            entity_id: "binary_sensor.santa_fe_hood_is_open",
+            state: "off",
+            attributes: { friendly_name: "Bonnet" },
+          },
+          "sensor.santa_fe_fuel_level": {
+            entity_id: "sensor.santa_fe_fuel_level",
+            state: "62",
+            attributes: { friendly_name: "Fuel level" },
+          },
+        },
+      };
+
+      // Deliberately carries settings the GUI does not expose: `invert` on an
+      // opening, and `min`/`max` on a tyre.
+      const START = {
+        type: "custom:car-status-card",
+        name: "Santa Fe",
+        vehicle: { preset: "suv" },
+        openings: {
+          bonnet: { entity: "binary_sensor.santa_fe_hood_is_open", invert: true },
+          door_fl: "binary_sensor.santa_fe_front_left_door_is_open",
+        },
+        tyres: { fl: { pressure: "sensor.tyre_fl", min: 30, max: 38 } },
+        regions: { left: [{ entity: "sensor.santa_fe_fuel_level", name: "Fuel" }] },
+      };
+
+      const host = document.getElementById("editor-host");
+      const out = document.getElementById("out");
+      let latest = structuredClone(START);
+
+      const editor = document.createElement("car-status-card-editor");
+      editor.hass = hass;
+      editor.setConfig(structuredClone(START));
+      editor.addEventListener("config-changed", (ev) => {
+        latest = ev.detail.config;
+        out.textContent = JSON.stringify(latest, null, 2);
+      });
+      host.appendChild(editor);
+      out.textContent = JSON.stringify(latest, null, 2);
+
+      /* ---- assertions ---- */
+      const results = [];
+      const check = (name, fn) => {
+        try {
+          const problem = fn();
+          results.push(problem ? { name, problem } : { name });
+        } catch (e) {
+          results.push({ name, problem: e.message });
+        }
+      };
+
+      const topForm = () => editor.shadowRoot.querySelector("ha-form");
+      const field = (path) => {
+        const el = editor.shadowRoot.querySelectorAll("ha-form");
+        for (const f of el) {
+          const hit = f.querySelector(`[data-path="${path}"]`);
+          if (hit) return hit;
+        }
+        // search nested light-DOM forms
+        return topForm().querySelector(`[data-path="${path}"]`);
+      };
+      const setField = (path, value) => {
+        const f = field(path);
+        if (!f) throw new Error(`no field for ${path}`);
+        f.value = value;
+        f.dispatchEvent(new Event("change"));
+      };
+
+      await new Promise((r) => requestAnimationFrame(r));
+
+      check("form flattens an opening object to its entity id", () => {
+        const f = field("bonnet");
+        if (!f) return "bonnet picker not rendered";
+        if (f.value !== "binary_sensor.santa_fe_hood_is_open")
+          return `showed ${JSON.stringify(f.value)}`;
+      });
+
+      check("editing an opening keeps invert", () => {
+        setField("bonnet", "binary_sensor.new_bonnet");
+        const b = latest.openings.bonnet;
+        if (b?.entity !== "binary_sensor.new_bonnet") return `entity is ${JSON.stringify(b)}`;
+        if (b?.invert !== true) return "invert was dropped";
+      });
+
+      check("an opening with no extras stays shorthand", () => {
+        setField("door_fl", "binary_sensor.other_door");
+        if (latest.openings.door_fl !== "binary_sensor.other_door")
+          return `got ${JSON.stringify(latest.openings.door_fl)}`;
+      });
+
+      check("tyre min/max survive an unrelated edit", () => {
+        const fl = latest.tyres?.fl;
+        if (fl?.min !== 30 || fl?.max !== 38) return `tyres.fl is ${JSON.stringify(fl)}`;
+      });
+
+      check("colour nests under vehicle.colors", () => {
+        setField("body", "amber");
+        if (latest.vehicle?.colors?.body !== "amber")
+          return `vehicle is ${JSON.stringify(latest.vehicle)}`;
+        if (latest.vehicle?.preset !== "suv") return "preset was lost";
+      });
+
+      check("clearing the title removes it rather than blanking it", () => {
+        setField("name", "");
+        if ("name" in latest) return `name is ${JSON.stringify(latest.name)}`;
+      });
+
+      check("adding a sensor appends to the region", () => {
+        const region = [...editor.shadowRoot.querySelectorAll("cs-region-editor")].find(
+          (r) => r.region === "left",
+        );
+        region.dispatchEvent(
+          new CustomEvent("items-changed", {
+            detail: { region: "left", items: [...region.items, { entity: "sensor.new" }] },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+        if (latest.regions.left?.length !== 2)
+          return `left has ${latest.regions.left?.length} items`;
+      });
+
+      check("emptying a region drops the key entirely", () => {
+        const region = [...editor.shadowRoot.querySelectorAll("cs-region-editor")].find(
+          (r) => r.region === "left",
+        );
+        region.dispatchEvent(
+          new CustomEvent("items-changed", {
+            detail: { region: "left", items: [] },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+        if ("left" in (latest.regions ?? {})) return "regions.left still present";
+        if (latest.regions) return "an empty regions object was left behind";
+      });
+
+      check("the card accepts everything the editor produced", () => {
+        const card = document.createElement("car-status-card");
+        card.setConfig({ ...latest, type: "custom:car-status-card" });
+      });
+
+      document.getElementById("results").innerHTML = results
+        .map((r) =>
+          r.problem
+            ? `<span class="fail">FAIL  ${r.name}\n        ${r.problem}</span>`
+            : `<span class="pass">pass  ${r.name}</span>`,
+        )
+        .join("\n");
+
+      window.__results = results;
+    </script>
+  </body>
+</html>

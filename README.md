@@ -8,7 +8,7 @@ Integration-agnostic — every entity is chosen by you. Developed against
 [Kia/Hyundai Connect](https://github.com/Hyundai-Kia-Connect/kia_uvo), but nothing is tied to it.
 
 > **Status: early.** The card renders, reacts to state and runs controls, all configured by YAML.
-> The graphical editor and gauges are not built yet — see [Roadmap](#roadmap).
+> Gauges are not built yet — see [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -34,6 +34,21 @@ Settings → Dashboards → ⋮ → Resources as a **JavaScript module**:
 ```
 
 ## Configuration
+
+The card ships a graphical editor, so **Add card → Car Status Card** gets you a working setup
+without touching YAML. It tries to fill itself in from your existing entities: openings are matched
+on names like `front_left_door`, `hood`/`bonnet` and `trunk`/`boot`, tyres on
+`tire`/`tyre` + `pressure`, plus a fuel or battery level and an odometer. Every guess is
+editable, and anything it can't find is simply left blank.
+
+The editor is organised as **Appearance**, **Doors, windows and openings**, **Tyres**, and then a
+section per region for sensors and controls, where rows can be added, reordered and removed. The
+opening and tyre pickers are built from the selected body style, so a preset without a sunroof
+never offers a sunroof picker.
+
+The YAML below is the full surface. A few advanced keys — `open_state`, `invert` and per-opening
+`color` — have no GUI control yet, but the editor carries them through untouched, so hand-written
+config survives being opened in the editor.
 
 ```yaml
 type: custom:car-status-card
@@ -208,10 +223,11 @@ is narrower than about 460px, so the card stays usable on mobile.
 - [x] Car graphic with door, window, bonnet and boot state
 - [x] Configurable sensor regions
 - [x] Control buttons — lock/unlock, hazards, climate
-- [ ] Graphical configuration editor
 - [x] Tyre pressures and warnings on the graphic
+- [x] Graphical configuration editor
 - [ ] Gauge and bar renderers for levels
 - [ ] Light and fault indicators on the graphic
+- [ ] Drag to reorder rows, and GUI controls for `open_state` / `invert`
 
 ## Development
 
@@ -229,6 +245,12 @@ fails if the committed bundle has drifted from the source.
 state, both open styles, and light and dark themes — so the artwork can be iterated without a
 round-trip to Home Assistant. `dev/art.html` shows just the graphic, large, for judging the
 drawing. Serve the repo root over HTTP and open either page.
+
+`dev/editor.html` runs the config editor against a stub of `ha-form` that reproduces the real
+element's nesting and merge behaviour, and asserts the round trip: that opening objects flatten to
+entity ids and back, that keys the GUI does not expose survive an edit, that cleared fields are
+removed rather than blanked, and that whatever the editor emits still passes `setConfig`. The
+assertions print pass/fail on the page.
 
 Artwork lives behind the `CarArt` contract in `src/art/types.ts`. Adding a body style is a new
 folder under `src/art/` plus one line in `src/art/index.ts`; the card and editor read the preset's

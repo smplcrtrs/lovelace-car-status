@@ -2,6 +2,9 @@ import { CARD_NAME, VERSION } from "./const";
 import { registerCustomCard } from "./ha";
 
 import "./card/car-status-card";
+// Registers the element that the card's getConfigElement creates. Bundled in
+// rather than dynamically imported so HACS still ships a single file.
+import "./editor/car-status-editor";
 
 registerCustomCard({
   // Registered without the `custom:` prefix — HA's card picker adds it.
