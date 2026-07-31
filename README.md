@@ -220,6 +220,11 @@ npm install
 npm run dev
 ```
 
+**`dist/car-status.js` is committed.** HACS validates the default branch when a repository has no
+releases, and requires the built `.js` to be present under `dist/` or the root — so the bundle has
+to be in git. Run `npm run build` and include the result in any commit that touches `src/`; CI
+fails if the committed bundle has drifted from the source.
+
 `dev/harness.html` renders the card against a stubbed `hass` in a plain browser — every panel
 state, both open styles, and light and dark themes — so the artwork can be iterated without a
 round-trip to Home Assistant. `dev/art.html` shows just the graphic, large, for judging the

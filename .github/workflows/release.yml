@@ -1,0 +1,30 @@
+name: Release
+
+# Builds the card and attaches it to the release, so HACS installs the
+# published bundle rather than whatever happens to be on the branch.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+      - name: Attach bundle to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/car-status.js

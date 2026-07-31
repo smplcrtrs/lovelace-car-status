@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# Built output. Committed for HACS, but collapsed in diffs and excluded from
+# language stats so it does not drown out real changes.
+dist/car-status.js linguist-generated=true
+
+# Reference artwork, not source.
+assets/reference/*.svg linguist-vendored=true
