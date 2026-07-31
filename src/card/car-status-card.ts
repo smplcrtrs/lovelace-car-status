@@ -64,6 +64,18 @@ export class CarStatusCard extends LitElement implements LovelaceCard {
     `;
   }
 
+  /**
+   * A flanking column with rows on one side only would push the car off centre,
+   * so the empty side is held open to balance it. Both sides empty stays empty —
+   * then the car should have the full width.
+   */
+  private _renderFlank(region: "left" | "right") {
+    if (this._items(region).length) return this._renderRegion(region);
+    const opposite = region === "left" ? "right" : "left";
+    if (!this._items(opposite).length) return nothing;
+    return html`<div class="region region-${region}" aria-hidden="true"></div>`;
+  }
+
   protected override render() {
     if (!this._config) return nothing;
 
@@ -72,9 +84,9 @@ export class CarStatusCard extends LitElement implements LovelaceCard {
         <div class="content">
           ${this._renderRegion("above")}
           <div class="middle">
-            ${this._renderRegion("left")}
+            ${this._renderFlank("left")}
             <cs-car-graphic .hass=${this.hass} .config=${this._config}></cs-car-graphic>
-            ${this._renderRegion("right")}
+            ${this._renderFlank("right")}
           </div>
           ${this._renderRegion("below")}
         </div>

@@ -443,6 +443,91 @@
         if (stub.regions) return `offered ${JSON.stringify(stub.regions)}`;
       });
 
+      // A real Hyundai Bluelink instance, including the decoys: a 12V battery
+      // alongside the fuel level, a hazards-and-horn variant, a tyre-pressure
+      // "all" rollup, and lamp-fault sensors that also read "front_left".
+      const BLUELINK = `device_tracker.santa_fe_location
+cover.santa_fe_front_right_window cover.santa_fe_front_left_window
+cover.santa_fe_back_right_window cover.santa_fe_back_left_window
+climate.santa_fe_climate_control lock.santa_fe_door_lock
+button.santa_fe_vent_all_windows button.santa_fe_stop_valet_mode
+button.santa_fe_start_valet_mode button.santa_fe_start_hazard_lights_and_horn
+button.santa_fe_start_hazard_lights button.santa_fe_open_all_windows
+button.santa_fe_force_refresh button.santa_fe_close_all_windows
+binary_sensor.santa_fe_washer_fluid_warning binary_sensor.santa_fe_trunk
+binary_sensor.santa_fe_tire_pressure_rear_right
+binary_sensor.santa_fe_tire_pressure_rear_left
+binary_sensor.santa_fe_tire_pressure_front_right
+binary_sensor.santa_fe_tire_pressure_front_left
+binary_sensor.santa_fe_tire_pressure_all binary_sensor.santa_fe_locked
+binary_sensor.santa_fe_hood binary_sensor.santa_fe_front_left_lamp_fault
+binary_sensor.santa_fe_front_right_lamp_fault
+binary_sensor.santa_fe_front_right_window binary_sensor.santa_fe_front_right_door
+binary_sensor.santa_fe_front_left_window binary_sensor.santa_fe_front_left_door
+binary_sensor.santa_fe_back_right_window binary_sensor.santa_fe_back_right_door
+binary_sensor.santa_fe_back_left_window binary_sensor.santa_fe_back_left_door
+binary_sensor.santa_fe_fuel_low_level binary_sensor.santa_fe_engine
+sensor.santa_fe_odometer sensor.santa_fe_fuel_level
+sensor.santa_fe_car_battery_level sensor.santa_fe_fuel_driving_range
+sensor.santa_fe_set_temperature sensor.santa_fe_data sensor.santa_fe
+sensor.galaxy_watch4_classic_z3qm_battery_level`
+        .split(/\s+/)
+        .filter(Boolean);
+
+      const bluelink = customElements
+        .get("car-status-card")
+        .getStubConfig({ states: Object.fromEntries(BLUELINK.map((id) => [id, {}])) });
+      window.__bluelink = bluelink;
+
+      check("Bluelink: all ten openings detected", () => {
+        const got = Object.keys(bluelink.openings ?? {});
+        const want = [
+          "door_fl",
+          "door_fr",
+          "door_rl",
+          "door_rr",
+          "window_fl",
+          "window_fr",
+          "window_rl",
+          "window_rr",
+          "bonnet",
+          "boot",
+        ];
+        const missing = want.filter((k) => !got.includes(k));
+        if (missing.length) return `missing ${missing.join(", ")}`;
+        if (bluelink.openings.bonnet !== "binary_sensor.santa_fe_hood")
+          return `bonnet is ${bluelink.openings.bonnet}`;
+      });
+
+      check("Bluelink: doors are doors, not lamp faults", () => {
+        if (bluelink.openings.door_fl !== "binary_sensor.santa_fe_front_left_door")
+          return `door_fl is ${bluelink.openings.door_fl}`;
+      });
+
+      check("Bluelink: warning-only tyres are configured", () => {
+        const t = bluelink.tyres;
+        if (!t) return "no tyres detected";
+        for (const pos of ["fl", "fr", "rl", "rr"]) {
+          if (!t[pos]?.warning) return `${pos} has no warning entity`;
+          if (t[pos].warning.includes("_all")) return `${pos} grabbed the rollup sensor`;
+        }
+      });
+
+      check("Bluelink: fuel wins over the 12V battery", () => {
+        const first = bluelink.regions?.left?.[0]?.entity;
+        if (first !== "sensor.santa_fe_fuel_level") return `picked ${first}`;
+      });
+
+      check("Bluelink: lock, climate and buttons become controls", () => {
+        const below = bluelink.regions?.below ?? [];
+        const byType = Object.fromEntries(below.map((c) => [c.type, c.entity]));
+        if (byType.lock !== "lock.santa_fe_door_lock") return `lock is ${byType.lock}`;
+        if (byType.climate !== "climate.santa_fe_climate_control")
+          return `climate is ${byType.climate}`;
+        const hazards = below.find((c) => c.name === "Hazards")?.entity;
+        if (hazards !== "button.santa_fe_start_hazard_lights") return `hazards picked ${hazards}`;
+      });
+
       check("the card accepts everything the editor produced", () => {
         const card = document.createElement("car-status-card");
         card.setConfig({ ...latest, type: "custom:car-status-card" });

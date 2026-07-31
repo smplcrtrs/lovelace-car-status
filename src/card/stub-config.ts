@@ -1,6 +1,6 @@
 import type { PanelId } from "../art";
 import type { HomeAssistant } from "../ha";
-import type { CarStatusCardConfig } from "./car-status-card-config";
+import type { CarStatusCardConfig, ControlItemConfig } from "./car-status-card-config";
 
 /**
  * Substrings that identify each opening in an entity id. Integrations name
@@ -28,8 +28,19 @@ const TYRE_PATTERNS: Record<string, string[]> = {
   rr: ["back_right", "rear_right", "_rr_"],
 };
 
-const find = (ids: string[], domain: string, needles: string[]): string | undefined =>
-  ids.find((id) => id.startsWith(`${domain}.`) && needles.some((n) => id.includes(n)));
+/**
+ * Needles are tried in order, each against every id, so the list reads as a
+ * preference. Scanning ids in the outer loop instead would let entity ordering
+ * decide, and a car with both `fuel_level` and `car_battery_level` could end up
+ * showing its 12V battery as the fuel gauge.
+ */
+const find = (ids: string[], domain: string, needles: string[]): string | undefined => {
+  for (const needle of needles) {
+    const hit = ids.find((id) => id.startsWith(`${domain}.`) && id.includes(needle));
+    if (hit) return hit;
+  }
+  return undefined;
+};
 
 /**
  * The object id up to whichever needle matched — `binary_sensor.santa_fe_hood`
@@ -79,16 +90,19 @@ export const buildStubConfig = (hass: HomeAssistant | undefined): StubConfig => 
   // on that same device.
   const scoped = prefix ? ids.filter((id) => id.includes(prefix)) : ids;
 
-  const tyres: Record<string, { pressure: string }> = {};
+  // Plenty of integrations report tyres only as a low-pressure flag with no
+  // numeric reading, so a warning alone is enough to configure a corner.
+  const tyres: Record<string, { pressure?: string; warning?: string }> = {};
   for (const [pos, needles] of Object.entries(TYRE_PATTERNS)) {
-    const match = scoped.find(
-      (id) =>
-        id.startsWith("sensor.") &&
-        /tire|tyre/.test(id) &&
-        /pressure/.test(id) &&
-        needles.some((n) => id.includes(n)),
+    const isCorner = (id: string) => /tire|tyre/.test(id) && needles.some((n) => id.includes(n));
+
+    const pressure = scoped.find(
+      (id) => id.startsWith("sensor.") && /pressure/.test(id) && isCorner(id),
     );
-    if (match) tyres[pos] = { pressure: match };
+    const warning = scoped.find((id) => id.startsWith("binary_sensor.") && isCorner(id));
+    if (pressure || warning) {
+      tyres[pos] = { ...(pressure && { pressure }), ...(warning && { warning }) };
+    }
   }
   // All four or none — a lone tyre reads as a fault rather than a partial setup.
   if (Object.keys(tyres).length === 4) {
@@ -97,9 +111,10 @@ export const buildStubConfig = (hass: HomeAssistant | undefined): StubConfig => 
 
   // `battery_level` and `state_of_charge` are only safe inside a known vehicle;
   // unscoped they match phones, watches and home batteries. `fuel_level` and
-  // `odometer` are specific enough to trust on their own.
+  // `odometer` are specific enough to trust on their own. Traction battery
+  // before the 12V one, which is usually `car_battery_level`.
   const levelNeedles = prefix
-    ? ["fuel_level", "battery_level", "state_of_charge"]
+    ? ["fuel_level", "ev_battery_level", "state_of_charge", "battery_level"]
     : ["fuel_level"];
 
   const left = [
@@ -107,9 +122,26 @@ export const buildStubConfig = (hass: HomeAssistant | undefined): StubConfig => 
     find(scoped, "sensor", ["odometer", "mileage"]),
   ].filter(Boolean) as string[];
 
-  if (left.length) {
-    config.regions = { left: left.map((entity) => ({ entity })) };
-  }
+  const below: ControlItemConfig[] = [];
+  const lock = find(scoped, "lock", [""]);
+  if (lock) below.push({ type: "lock", entity: lock });
+
+  const climate = find(scoped, "climate", [""]);
+  if (climate) below.push({ type: "climate", entity: climate });
+
+  // Prefer plain hazards over the variant that also sounds the horn.
+  const hazards =
+    scoped.find((id) => id.startsWith("button.") && /hazard/.test(id) && !/horn/.test(id)) ??
+    find(scoped, "button", ["hazard"]);
+  if (hazards) below.push({ type: "button", entity: hazards, name: "Hazards" });
+
+  const refresh = find(scoped, "button", ["force_refresh", "refresh", "update"]);
+  if (refresh) below.push({ type: "button", entity: refresh, name: "Refresh" });
+
+  const regions: CarStatusCardConfig["regions"] = {};
+  if (left.length) regions.left = left.map((entity) => ({ entity }));
+  if (below.length) regions.below = below;
+  if (Object.keys(regions).length) config.regions = regions;
 
   return config;
 };
