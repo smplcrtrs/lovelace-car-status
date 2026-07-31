@@ -32,28 +32,56 @@ const find = (ids: string[], domain: string, needles: string[]): string | undefi
   ids.find((id) => id.startsWith(`${domain}.`) && needles.some((n) => id.includes(n)));
 
 /**
+ * The object id up to whichever needle matched — `binary_sensor.santa_fe_hood`
+ * with needle `hood` gives `santa_fe_`. Used to scope the rest of the search to
+ * one vehicle: without it, a pattern like `battery_level` cheerfully matches a
+ * smartwatch.
+ */
+const devicePrefix = (id: string, needles: string[]): string => {
+  const objectId = id.slice(id.indexOf(".") + 1);
+  for (const needle of needles) {
+    const at = objectId.indexOf(needle);
+    if (at > 0) return objectId.slice(0, at);
+  }
+  return "";
+};
+
+/**
  * A best-effort starting point for the card picker preview and a new card.
  * Everything here is a guess the user can correct in the editor, so it errs
  * towards leaving a field out rather than filling it in wrongly.
+ *
+ * Deliberately omits `type`. Home Assistant builds `{ type: "custom:<name>" }`
+ * and spreads this over it, so returning a type here overwrites the prefixed
+ * one with a bare name the frontend cannot resolve.
  */
-export const buildStubConfig = (hass: HomeAssistant | undefined, type: string) => {
-  const config: CarStatusCardConfig = { type, name: "Car" };
+export type StubConfig = Omit<CarStatusCardConfig, "type">;
+
+export const buildStubConfig = (hass: HomeAssistant | undefined): StubConfig => {
+  const config: StubConfig = { name: "Car" };
   if (!hass) return config;
 
   const ids = Object.keys(hass.states);
 
   const openings: Record<string, string> = {};
+  let prefix = "";
   for (const [panel, needles] of Object.entries(PANEL_PATTERNS)) {
     const match = find(ids, "binary_sensor", needles);
-    if (match) openings[panel] = match;
+    if (!match) continue;
+    openings[panel] = match;
+    prefix ||= devicePrefix(match, needles);
   }
   if (Object.keys(openings).length) {
     config.openings = openings as CarStatusCardConfig["openings"];
   }
 
+  // Once an opening has identified the vehicle, everything else is looked for
+  // on that same device.
+  const scoped = prefix ? ids.filter((id) => id.includes(prefix)) : ids;
+
   const tyres: Record<string, { pressure: string }> = {};
   for (const [pos, needles] of Object.entries(TYRE_PATTERNS)) {
-    const match = ids.find(
+    const match = scoped.find(
       (id) =>
         id.startsWith("sensor.") &&
         /tire|tyre/.test(id) &&
@@ -67,9 +95,16 @@ export const buildStubConfig = (hass: HomeAssistant | undefined, type: string) =
     config.tyres = tyres as CarStatusCardConfig["tyres"];
   }
 
+  // `battery_level` and `state_of_charge` are only safe inside a known vehicle;
+  // unscoped they match phones, watches and home batteries. `fuel_level` and
+  // `odometer` are specific enough to trust on their own.
+  const levelNeedles = prefix
+    ? ["fuel_level", "battery_level", "state_of_charge"]
+    : ["fuel_level"];
+
   const left = [
-    find(ids, "sensor", ["fuel_level", "battery_level", "state_of_charge"]),
-    find(ids, "sensor", ["odometer", "mileage"]),
+    find(scoped, "sensor", levelNeedles),
+    find(scoped, "sensor", ["odometer", "mileage"]),
   ].filter(Boolean) as string[];
 
   if (left.length) {

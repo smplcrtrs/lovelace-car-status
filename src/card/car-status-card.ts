@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { CARD_NAME, EDITOR_NAME } from "../const";
 import type { HomeAssistant, LovelaceCard, LovelaceCardEditor, LovelaceGridOptions } from "../ha";
-import { buildStubConfig } from "./stub-config";
+import { buildStubConfig, type StubConfig } from "./stub-config";
 import {
   isControl,
   validateConfig,
@@ -27,8 +27,8 @@ export class CarStatusCard extends LitElement implements LovelaceCard {
     return document.createElement(EDITOR_NAME) as LovelaceCardEditor;
   }
 
-  public static getStubConfig(hass: HomeAssistant): CarStatusCardConfig {
-    return buildStubConfig(hass, CARD_NAME);
+  public static getStubConfig(hass: HomeAssistant): StubConfig {
+    return buildStubConfig(hass);
   }
 
   public setConfig(config: CarStatusCardConfig): void {

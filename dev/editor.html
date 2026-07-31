@@ -406,6 +406,43 @@
         if (latest.regions) return "an empty regions object was left behind";
       });
 
+      // Regression: a `type` here overrode HA's "custom:car-status-card" with a
+      // bare name, and every freshly added card failed with "Unknown type".
+      check("getStubConfig does not clobber the custom: type", () => {
+        const stub = customElements.get("car-status-card").getStubConfig(hass);
+        if ("type" in stub) return `stub returned type: ${JSON.stringify(stub.type)}`;
+        // How Home Assistant assembles it.
+        const merged = { type: "custom:car-status-card", ...stub };
+        if (merged.type !== "custom:car-status-card") return `type became ${merged.type}`;
+      });
+
+      // Regression: `battery_level` matched sensor.galaxy_watch4_..._battery_level
+      // and offered a smartwatch as the car's fuel gauge.
+      check("auto-detect ignores unrelated devices", () => {
+        const noisy = {
+          states: {
+            "binary_sensor.santa_fe_hood": {},
+            "binary_sensor.santa_fe_front_left_door": {},
+            "sensor.galaxy_watch4_classic_z3qm_battery_level": {},
+            "sensor.santa_fe_ev_battery_level": {},
+            "sensor.santa_fe_odometer": {},
+          },
+        };
+        const stub = customElements.get("car-status-card").getStubConfig(noisy);
+        const picked = stub.regions?.left?.map((r) => r.entity) ?? [];
+        if (picked.some((e) => e.includes("galaxy_watch")))
+          return `picked the watch: ${picked.join(", ")}`;
+        if (!picked.includes("sensor.santa_fe_ev_battery_level"))
+          return `missed the car battery, got ${picked.join(", ") || "nothing"}`;
+      });
+
+      check("with no car found, generic battery sensors are left alone", () => {
+        const stub = customElements.get("car-status-card").getStubConfig({
+          states: { "sensor.galaxy_watch4_classic_z3qm_battery_level": {} },
+        });
+        if (stub.regions) return `offered ${JSON.stringify(stub.regions)}`;
+      });
+
       check("the card accepts everything the editor produced", () => {
         const card = document.createElement("car-status-card");
         card.setConfig({ ...latest, type: "custom:car-status-card" });
